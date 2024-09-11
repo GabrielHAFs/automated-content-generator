@@ -5,7 +5,7 @@ import json
 import sys
 from dotenv import load_dotenv
 from openai import OpenAI
-from src.dataset.core.prompts import prompts
+from src.core.prompts import prompts
 
 _ = load_dotenv()
 
