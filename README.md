@@ -16,6 +16,10 @@ poetry install --no-root
 
 ## Run the script
 
+### Using poetry
+
 ```
 poetry run python script.py
 ```
+
+### Using a Docker container
