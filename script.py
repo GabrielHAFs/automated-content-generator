@@ -71,15 +71,15 @@ def main():
             user_prompt=user_prompt, 
             model="gpt-4o-2024-08-06"
         )
-        print(article_cot)
+        print(f"\n{article_cot}\n")
         
         # Save the generated article to a JSON file
         if article_cot:
             with open(args.output, 'w') as file:
                 json.dump(article_cot, file, indent=2)
-            print(f"Article saved to {args.output}")
+            print(f"\nArticle saved to {args.output}")
         else:
-            print("Failed to generate article.")
+            print("\nFailed to generate article.")
 
     elif args.mode == 'image_caption':
         if not args.image or not validate_file_type(args.image, ('.jpeg', '.jpg', '.png')):

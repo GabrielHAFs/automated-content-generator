@@ -1,4 +1,6 @@
 import json
+import sys
+import time
 
 def article_generation(
         client, 
@@ -17,6 +19,14 @@ def article_generation(
     Returns:
         str: The structured JSON content of the generated article.
     """
+    print("Generating your article\n", end="")
+    
+    for _ in range(5):
+        sys.stdout.write(".")
+        sys.stdout.flush()
+        time.sleep(0.5)
+    print(" Please wait...")
+    
     try:
         response = client.chat.completions.create(
             model=model,
@@ -73,6 +83,14 @@ def image_captioning(
     Returns:
         str: The image caption
     """
+    print("Generating your image caption\n", end="")
+    
+    for _ in range(5):
+        sys.stdout.write(".")
+        sys.stdout.flush()
+        time.sleep(0.5)
+    print(" Please wait...")
+
     try:
         response = client.chat.completions.create(
             messages=[
