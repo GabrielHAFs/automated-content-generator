@@ -6,103 +6,105 @@ import sys
 from dotenv import load_dotenv
 from openai import OpenAI
 from src.core.prompts import prompts
+from src.core.chat_completions import article_generation, image_captioning
+from groq import Groq
+import base64
+from dotenv import load_dotenv
+import argparse
 
 _ = load_dotenv()
 
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+GROQ_API_KEY = os.getenv('GROQ_API_KEY')
 
 client_openai = OpenAI(
     api_key=OPENAI_API_KEY,
 )
+client_groq = Groq(
+    api_key=GROQ_API_KEY,
+)
 
-def article_generation(
-        client, 
-        system_prompt: str, 
-        user_prompt: str, 
-        model: str = "gpt-4o"):
-    """
-    Generates an article using a language model with a structured JSON schema output.
+def validate_file_type(file_path, expected_extensions):
+    return file_path.lower().endswith(expected_extensions)
 
-    Args:
-        client: The OpenAI API client instance.
-        system_prompt (str): The initial prompt given to the system to set the tone or context.
-        user_prompt (str): The content or prompt provided by the user, typically a string generated from a DataFrame or similar source.
-        model (str): The model to use for generating the completion. Default is 'llama3-70b-8192'.
+def validate_image_size(image_path, max_size_mb=20):
+    file_size_mb = os.path.getsize(image_path) / (1024 * 1024)
+    return file_size_mb <= max_size_mb
 
-    Returns:
-        str: The structured JSON content of the generated article.
-    """
-    try:
-        response = client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
-            response_format={
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "article_response",
-                    "schema": {
-                        "type": "object",
-                        "properties": {
-                            "article_title": {"type": "string"},
-                            "sections": {
-                                "type": "array",
-                                "items": {
-                                    "type": "object",
-                                    "properties": {
-                                        "headline": {"type": "string"},
-                                        "body": {"type": "string"}
-                                    },
-                                    "required": ["headline", "body"],
-                                    "additionalProperties": False
-                                }
-                            }
-                        },
-                        "required": ["article_title", "sections"],
-                        "additionalProperties": False
-                    },
-                    "strict": True
-                }
-            }
+def encode_image(image_path):
+  with open(image_path, "rb") as image_file:
+    return base64.b64encode(image_file.read()).decode('utf-8')
+
+def main():
+    parser = argparse.ArgumentParser(description="Automated Content Generation Tool")
+    
+    parser.add_argument('-m', '--mode', choices=['article_gen', 'image_caption'], required=True,
+                        help="Mode of operation: 'article_gen' to generate articles, 'image_caption' to generate captions for images.")
+    
+    parser.add_argument('-k', '--keywords-file', type=str, help="Path to the keywords CSV file (required for article generation mode).")
+    parser.add_argument('-i', '--image', type=str, help="Path to the image file (required for image captioning mode).")
+    parser.add_argument('-o', '--output', type=str, required=True, help="Path to the output JSON file.")
+
+    args = parser.parse_args()
+
+    if args.mode == 'article_gen':
+        if not args.keywords_file or not validate_file_type(args.keywords_file, '.csv'):
+            print("Error: You must provide a valid CSV file for article generation.")
+            sys.exit(1)
+        if not validate_file_type(args.output, '.json'):
+            print("Error: Output file must be a JSON file.")
+            sys.exit(1)
+
+        # Load the CSV file
+        df = pd.read_csv(args.keywords_file)
+        
+        # Prepare the user prompt
+        user_prompt = prompts["user_prompt"].format(
+            main_keyword=df['Main Keyword'].iloc[0],
+            sec_keywords=df['Secondary Keywords'].iloc[0]
         )
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        return None
+        
+        # Generate the article using Chain of Thought (CoT) prompt
+        article_cot = article_generation(
+            client_openai, 
+            system_prompt=prompts["cot_system_prompt"], 
+            user_prompt=user_prompt, 
+            model="gpt-4o-2024-08-06"
+        )
+        print(article_cot)
+        
+        # Save the generated article to a JSON file
+        if article_cot:
+            with open(args.output, 'w') as file:
+                json.dump(article_cot, file, indent=2)
+            print(f"Article saved to {args.output}")
+        else:
+            print("Failed to generate article.")
 
-    return json.loads(response.choices[0].message.content)
+    elif args.mode == 'image_caption':
+        if not args.image or not validate_file_type(args.image, ('.jpeg', '.jpg', '.png')):
+            print("Error: You must provide a valid image file (jpeg, jpg, png) for image captioning.")
+            sys.exit(1)
+        if not validate_image_size(args.image):
+            print("Error: Image file size must be under 20MB.")
+            sys.exit(1)
+        if not validate_file_type(args.output, '.json'):
+            print("Error: Output file must be a JSON file.")
+            sys.exit(1)
 
-def main(csv_path):
-    # Load the CSV file
-    df = pd.read_csv(csv_path)
-    
-    # Prepare the user prompt
-    user_prompt = prompts["user_prompt"].format(
-        main_keyword=df['Main Keyword'].iloc[0],
-        sec_keywords=df['Secondary Keywords'].iloc[0]
-    )
-    
-    # Generate the article using Chain of Thought (CoT) prompt
-    article_cot = article_generation(
-        client_openai, 
-        system_prompt=prompts["cot_system_prompt"], 
-        user_prompt=user_prompt, 
-        model="gpt-4o-2024-08-06"
-    )
-    
-    # Save the generated article to a JSON file
-    if article_cot:
-        output_file = 'output.json'
-        with open(output_file, 'w') as file:
-            json.dump(article_cot, file, indent=2)
-        print(f"Article saved to {output_file}")
-    else:
-        print("Failed to generate article.")
+        # Generate image caption
+        encoded_image = encode_image(args.image)
+
+        caption = image_captioning(client_groq, encoded_image)
+        print(caption)
+        
+        # Save the caption to a JSON file
+        if caption:
+            with open(args.output, 'w') as file:
+                json.dump(caption, file, indent=2)
+            print(f"Caption saved to {args.output}")
+        else:
+            print("Failed to generate image caption.")
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: python script.py <path_to_csv>")
-    else:
-        csv_path = sys.argv[1]
-        main(csv_path)
+    main()

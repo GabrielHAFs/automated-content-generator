@@ -18,9 +18,8 @@ Our repository is organized as follows:
 ├── script.py
 └── src
     ├── core
+    │   ├── chat_completions.py
     │   ├── prompts.py
-    │   └── __pycache__
-    │       └── prompts.cpython-311.pyc
     └── dataset
         ├── test_keywords.csv
         ├── arduino-uno.jpg
