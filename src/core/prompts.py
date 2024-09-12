@@ -21,7 +21,7 @@ prompts = {
         """,
 
     "user_prompt": """
-        Generate a 200 words SEO-friendly article about the theme in the keywords:
+        Generate a 2000 to 2500 words SEO-friendly article about the theme in the keywords:
         Main keyword = {main_keyword}
         Secondary Keywords = {sec_keywords}
         """,
