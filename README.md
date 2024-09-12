@@ -1,4 +1,4 @@
-# Automated Content Generator - StudySmart
+# Automated Content Generator
 
 This is a basic prototype of an automated content generation system using Python and GPT-based models. 
 
